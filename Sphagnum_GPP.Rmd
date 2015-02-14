@@ -1,0 +1,44 @@
+---
+title: "Sphagum_GPP"
+output: html_document
+---
+
+Calculation of GPP: as a f(mean_night_CO2 - mean_day_CO2)
+
+```{r, echo=FALSE, results='hide'}
+setwd("~/Desktop/SPRUCE_paper")
+data1<-read.csv("SPRUCE_LI8100_2014_Env_Combined_all.csv")
+head(data1)
+tail(data1)
+summary(data1)
+library(dplyr)
+library(ggvis)
+dat.df<-tbl_df(data1)
+names(dat.df)
+```
+
+
+This is the average valuer per day for each of chambers 3-6, then summed for all 4 chambers over the year.
+
+
+```{r}
+
+night_GPP<-dat.df %>%
+    select(Port., DFOY, DOY, Exp_Flux_Corr, Binned.Time.of.Day) %>%
+    filter(Binned.Time.of.Day=="Night", Exp_Flux_Corr > 0, Port. >=3) %>%
+    group_by(DOY, Port.) %>%
+    summarise(night_mean = mean(Exp_Flux_Corr))
+
+day_GPP<-dat.df %>%
+    select(Port., DFOY, DOY, Exp_Flux_Corr, Binned.Time.of.Day) %>%
+    filter(Binned.Time.of.Day=="Midday", Exp_Flux_Corr < 0, Port. >=3) %>%
+    group_by(DOY, Port.) %>%
+    summarise(day_mean = mean(Exp_Flux_Corr))
+              
+head(night_GPP)
+dim(night_GPP)
+colSums(night_GPP[,3])
+colSums(day_GPP[,3])
+
+```
+

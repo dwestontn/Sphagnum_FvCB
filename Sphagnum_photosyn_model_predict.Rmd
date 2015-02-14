@@ -1,0 +1,189 @@
+---
+title: "Sphagnum_photosynthesis_model"
+output: html_document
+---
+
+A basic FvCB model of photosynthesis
+There is no optimization for N or gm. 
+no accounting for peat respiration -- next on list
+
+```{r}
+photosyn.Sphagnum<-function(mydf)
+{
+    temperature=mydf$temperature
+    PFD=mydf$PFD
+    Jmax25=mydf$Jmax25
+    Vcmax25=mydf$Vcmax25
+    Tp25=mydf$Tp25
+    Ca=mydf$Ca
+    Rd=mydf$Rd
+    DFOY=mydf$DFOY
+    abs_Exp_Flux_Corr=mydf$abs_Exp_Flux_Corr
+    
+    
+    #Ci must be in ppm
+	R<-0.008314
+   	T<-273.15 + temperature
+	Q<-PFD     #photosynthetic photon flux density umol m-2 s-1
+	a1<-0.5    #total leaf absorbance NEED A BETTER VALUE
+	B<-0.7	   #fraction of absorbed quanta reaching PSII NEED BETTER VALUE
+	Ko<- 277 # Sage et al. 2008 (mbar)
+	Kc<- 406 # Sage et al. 2008 (ubar)
+	O<- 21 #this is in kPa!!!!!!!
+	
+	Patm<-101 # units are in kPa, from Sharkey worksheet
+	OpsllT<-0.76+(0.018*temperature)-(3.7e-4*temperature^2)
+	JmaxT<-Jmax25*exp(17.57-(43.54/(R*T)) )
+	QpsllmaxT<-0.352+(0.022*temperature)-(3.4e-4*temperature^2)
+	Q2<-Q*a1*QpsllmaxT*B
+	rhoT<-exp(11.187 - (24.46/(R*T))*O/21)     #Pa
+	RdT<-Rd*exp(18.72-(46.39/(R*T)))
+	KcT<- exp (35.9774 - (80.99/(R*T)))  		#Pa
+	KoT<- exp (12.3772 - (23.72/(R*T)))  		#kPa
+	VcmaxT<- Vcmax25*exp(26.35-(65.33/(R*T)))	
+	CaPa<-Ca*Patm*0.001 #Ca is now in Pa
+	Cc<-CaPa*0.74 #the resistance for wet plants from Rice and Giles 1996 PC&E
+	
+	
+	#Rubisco limited photosynthesis
+	#-----------------------------------------------------------------------
+	#rhoT  #untis in Pa not umol mol-1 as Ci model
+	
+	
+	Wc<-VcmaxT*(Cc-rhoT)/(Cc+KcT*(1+O/KoT))-RdT
+	
+	
+	#RuBP limited photosynthesis
+	#----------------------------------------------------------------------
+
+	#in Sharkey worksheet, J is estimated from gas exchange data
+	#here, we estimate J using equations from above
+	#also note that Sharkey uses 4 and 8, others use 4.5 and 10.5
+	
+	a<-sqrt((Q2+JmaxT)^2-(4*OpsllT*Q2*JmaxT))
+	Jc<-(Q2+JmaxT-a)/(2*OpsllT)
+	
+	
+	Wj<-Jc*(Cc-rhoT)/((4*Cc)+(8*rhoT))-RdT
+	
+	
+	#TPU limited photosynthesis
+	#-----------------------------------------------------------------------
+	#delta Ha = 64 kJ mol-1
+	#check this with original source
+	
+	Tpt<-Tp25*exp(21.46-53.1/(0.008314*(273.15+temperature)))/(1+exp((0.65*(temperature+273.15)-201.8)/(0.008314*(temperature+273.15))))
+	
+	Atp<-3*Tpt-RdT
+	
+    DFOY<-DFOY
+    abs_Exp_Flux_Corr<-abs_Exp_Flux_Corr
+    
+   return(data.frame(Wc,Wj,Atp, DFOY, abs_Exp_Flux_Corr))
+    #write.csv(photosyn.output, "photosyn_output.csv")
+#    return(data_combine)
+#    write.csv(data_combine, "photosyn_data.csv")
+#    
+#plot(temperature, Wj, xlab="Temperature (C)", ylab="Predicted Net CO2 assimilation", #col3=("black"), ylim=c(0, 40))
+#	points(temperature, Wc, pch=23, col=("blue"))
+#	points(temperature, Atp, pch=25, col=("red"))
+#	legend("topleft", pch=16, c("RuBP limited", "Rubisco limited", "TPU limited"), col=c("black", #"blue", "red"))
+	
+}
+
+```
+
+Looking at this in realtion to one Sphagnum port:
+Temp, light, and [CO2] is from environmental data
+Jmax25, Vcmax25, Tp25, and Rd are inputs
+Note, because IV.CO2 leves were strange, I used a constant 400ppm. 
+The Mean.Sph.PAR looked funny, so using EM1_PAR_NorthofHollow2, need to check with Paul on that.
+
+Function variables:
+temperature, PFD, Jmax25, Vcmax25, Tp25, Ca, Rd
+
+temperature, PFD, Jmax25, Vcmax25, Tp25, Ca, Rd, DFOY, Exp_Flux_Corr
+
+Plot of Port 4, preidction vs. measured midday values
+
+```{r, echo=FALSE}
+setwd("~/Desktop/SPRUCE_paper")
+library(dplyr)
+library(ggplot2)
+mydf1<-read.csv("SPRUCE_LI8100_2014_Env_Combined_all.csv")
+
+mydf<-mydf1%>%
+    select(DFOY, Exp_Flux_Corr, Port., Binned.Time.of.Day, temperature = Mean.Sph.Temp.0cm, PFD = EM1_PAR_NorthofHollow2) %>%
+    filter(PFD > 0, Port. == 4, Binned.Time.of.Day == "Midday") %>%
+    mutate(Jmax25 = 50, Vcmax25 = 30, Tp25 = 11, Ca = 400, Rd =1, abs_Exp_Flux_Corr = abs(Exp_Flux_Corr)) %>%
+    select(temperature, PFD, Jmax25, Vcmax25, Tp25, Ca, Rd, DFOY, abs_Exp_Flux_Corr)
+
+mydf.all<-photosyn.Sphagnum(mydf)
+mydf.all$min_flux <- apply(mydf.all[,1:3],1,min)
+
+
+ggplot(mydf.all, aes(DFOY)) + 
+  geom_line(aes(y = abs_Exp_Flux_Corr, colour = "measured")) + 
+  geom_line(aes(y = min_flux, colour = "pred")) 
+```
+
+
+Plot of Port 3, preidction vs. measured midday values
+
+```{r, echo=FALSE}
+mydf<-mydf1%>%
+    select(DFOY, Exp_Flux_Corr, Port., Binned.Time.of.Day, temperature = Mean.Sph.Temp.0cm, PFD = EM1_PAR_NorthofHollow2) %>%
+    filter(PFD > 0, Port. == 3, Binned.Time.of.Day == "Midday") %>%
+    mutate(Jmax25 = 30, Vcmax25 = 15, Tp25 = 11, Ca = 400, Rd =1, abs_Exp_Flux_Corr = abs(Exp_Flux_Corr)) %>%
+    select(temperature, PFD, Jmax25, Vcmax25, Tp25, Ca, Rd, DFOY, abs_Exp_Flux_Corr)
+
+mydf.all<-photosyn.Sphagnum(mydf)
+mydf.all$min_flux <- apply(mydf.all[,1:3],1,min)
+
+
+ggplot(mydf.all, aes(DFOY)) + 
+  geom_line(aes(y = abs_Exp_Flux_Corr, colour = "measured")) + 
+  geom_line(aes(y = min_flux, colour = "pred")) 
+
+```
+
+Plot of Port 5, preidction vs. measured midday values
+
+```{r, echo=FALSE}
+
+mydf<-mydf1%>%
+    select(DFOY, Exp_Flux_Corr, Port., Binned.Time.of.Day, temperature = Mean.Sph.Temp.0cm, PFD = EM1_PAR_NorthofHollow2) %>%
+    filter(PFD > 0, Port. == 5, Binned.Time.of.Day == "Midday") %>%
+    mutate(Jmax25 = 30, Vcmax25 = 15, Tp25 = 11, Ca = 400, Rd =1, abs_Exp_Flux_Corr = abs(Exp_Flux_Corr)) %>%
+    select(temperature, PFD, Jmax25, Vcmax25, Tp25, Ca, Rd, DFOY, abs_Exp_Flux_Corr)
+
+mydf.all<-photosyn.Sphagnum(mydf)
+mydf.all$min_flux <- apply(mydf.all[,1:3],1,min)
+
+
+ggplot(mydf.all, aes(DFOY)) + 
+  geom_line(aes(y = abs_Exp_Flux_Corr, colour = "measured")) + 
+  geom_line(aes(y = min_flux, colour = "pred")) 
+
+```
+
+Plot of Port 6, preidction vs. measured midday values
+
+```{r, echo=FALSE}
+
+mydf<-mydf1%>%
+    select(DFOY, Exp_Flux_Corr, Port., Binned.Time.of.Day, temperature = Mean.Sph.Temp.0cm, PFD = EM1_PAR_NorthofHollow2) %>%
+    filter(PFD > 0, Port. == 6, Binned.Time.of.Day == "Midday") %>%
+    mutate(Jmax25 = 40, Vcmax25 = 20, Tp25 = 11, Ca = 400, Rd =1, abs_Exp_Flux_Corr = abs(Exp_Flux_Corr)) %>%
+    select(temperature, PFD, Jmax25, Vcmax25, Tp25, Ca, Rd, DFOY, abs_Exp_Flux_Corr)
+
+mydf.all<-photosyn.Sphagnum(mydf)
+mydf.all$min_flux <- apply(mydf.all[,1:3],1,min)
+
+
+ggplot(mydf.all, aes(DFOY)) + 
+  geom_line(aes(y = abs_Exp_Flux_Corr, colour = "measured")) + 
+  geom_line(aes(y = min_flux, colour = "pred")) 
+
+```
+

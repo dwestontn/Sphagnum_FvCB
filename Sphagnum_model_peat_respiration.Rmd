@@ -1,0 +1,101 @@
+---
+title: "Sphagnum_regression_peat_tissue_respiration"
+output: html_document
+---
+
+We previously ran a basic FvCB tunned to Sphagnum that did NOT account for dead peat respiration. 
+
+Here, we look at correcting that by first using a linear regression model to estimate peat respiration from temperature using the cut chambers (those chambers that had live SPhagnum cut from them). 
+
+```{r, echo=FALSE, results='hide'}
+setwd("~/Desktop/SPRUCE_paper")
+data1<-read.csv("SPRUCE_LI8100_2014_Env_Combined_all.csv")
+head(data1)
+tail(data1)
+summary(data1)
+library(dplyr)
+library(ggvis)
+dat.df<-tbl_df(data1)
+names(dat.df)
+```
+
+determine hetertrophic respiration as a linear regression of bare plots by temp
+    
+```{r, echo=FALSE}
+
+df.select<-select(dat.df, DFOY, Binned.Time.of.Day,IV.Tcham, Temp.C, PAR, IV.RH,Exp_Flux_Corr, Mean.Sph.Temp.0cm, DOY, IV.CO2, Port.)
+df.filter<-filter(df.select,DOY > 240, Mean.Sph.Temp.0cm >=0, Port. == 2)
+temp <-df.filter$Mean.Sph.Temp.0cm 
+flux <- df.filter$Exp_Flux_Corr
+
+lm.heterotroph <- lm(flux ~ temp)
+summary(lm.heterotroph)
+
+```
+
+Here is a plot of the predicted values from the observed for the cut bare plots for bar plot flux by predicted values
+
+```{r, echo=FALSE}
+pred.flux<-predict(lm.heterotroph)
+plot(flux, pred.flux, xlim=c(0,2), col='dark gray')
+
+```
+
+How does this compare to night time values for bare plots, and night time values for plots with live sphagnum?
+
+First, the bare plots night temp vs. predcition values 
+
+```{r, echo=FALSE}
+
+df.select<-select(dat.df, DFOY, Binned.Time.of.Day,IV.Tcham, Temp.C, PAR, IV.RH,Exp_Flux_Corr, Mean.Sph.Temp.0cm, DOY, IV.CO2, Port.)
+filter.night<-filter(df.select,DOY > 240, Binned.Time.of.Day =="Night", Mean.Sph.Temp.0cm >=0, Port. == 2)
+temp.night <-filter.night$Mean.Sph.Temp.0cm 
+flux.night <- filter.night$Exp_Flux_Corr
+
+lm.heterotroph.night <- lm(flux.night ~ temp.night)
+summary(lm.heterotroph.night)
+
+pred.flux.night<-predict(lm.heterotroph.night)
+plot(flux.night, pred.flux.night, xlim=c(0,2), col='dark gray')
+
+```
+
+
+Now lets compare the predicted vlaues to night time chambers values with Sphagnum. this will have plant dark respiration values. Test with chamner 4
+
+```{r, echo=FALSE, results='hide'}
+a<-dat.df %>%
+    select(DFOY, Binned.Time.of.Day,IV.Tcham, Temp.C, PAR, IV.RH,Exp_Flux_Corr, Mean.Sph.Temp.0cm, DOY, IV.CO2, Port.) %>%
+    filter(DOY > 240, Binned.Time.of.Day =="Night", Mean.Sph.Temp.0cm >=0, Port. == 4) %>%
+    mutate(pred.values = 0.171073 + 0.061759*Mean.Sph.Temp.0cm)
+
+    plot(a$Exp_Flux_Corr, a$pred.values, xlim=c(0,2), col='dark gray')
+```
+
+Now lets compare the predicted vlaues to night time chambers values with Sphagnum. this will have plant dark respiration values. Test with chamner 5
+
+
+```{r, echo=FALSE, results='hide'}
+b<-dat.df %>%
+    select(DFOY, Binned.Time.of.Day,IV.Tcham, Temp.C, PAR, IV.RH,Exp_Flux_Corr, Mean.Sph.Temp.0cm, DOY, IV.CO2, Port.) %>%
+    filter(DOY > 240, Binned.Time.of.Day =="Night", Mean.Sph.Temp.0cm >=0, Port. == 5) %>%
+    mutate(pred.values = 0.171073 + 0.061759*Mean.Sph.Temp.0cm)
+
+    plot(b$Exp_Flux_Corr, b$pred.values, xlim=c(0,2), col='dark gray')
+```
+
+
+Now lets compare the predicted vlaues to night time chambers values with Sphagnum. this will have plant dark respiration values. Test with chamner 6
+
+
+```{r, echo=FALSE, results='hide'}
+c<-dat.df %>%
+    select(DFOY, Binned.Time.of.Day,IV.Tcham, Temp.C, PAR, IV.RH,Exp_Flux_Corr, Mean.Sph.Temp.0cm, DOY, IV.CO2, Port.) %>%
+    filter(DOY > 240, Binned.Time.of.Day =="Night", Mean.Sph.Temp.0cm >=0, Port. == 5) %>%
+    mutate(pred.values = 0.171073 + 0.061759*Mean.Sph.Temp.0cm)
+
+    plot(c$Exp_Flux_Corr, c$pred.values, xlim=c(0,2), col='dark gray')
+```
+
+
+
