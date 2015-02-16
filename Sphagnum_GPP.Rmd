@@ -6,7 +6,7 @@ output: html_document
 Calculation of GPP: as a f(mean_night_CO2 - mean_day_CO2)
 
 ```{r, echo=FALSE, results='hide'}
-setwd("~/Desktop/SPRUCE_paper")
+setwd("~/GitHub/Sphagnum_FvCB")
 data1<-read.csv("SPRUCE_LI8100_2014_Env_Combined_all.csv")
 head(data1)
 tail(data1)
@@ -41,4 +41,64 @@ colSums(night_GPP[,3])
 colSums(day_GPP[,3])
 
 ```
+
+
+
+So its possible there is a tissue respiration signal that is distinguishable from peat respiration. Will look at this with some simple cumsum plots. 
+
+daily night time averge for 2 clip plots vs non-clipped. 
+
+This is for DOY > 240
+```{r}
+
+night_GPP_clipped<-dat.df %>%
+    select(Port., DFOY, DOY, Exp_Flux_Corr, Binned.Time.of.Day) %>%
+    filter(Binned.Time.of.Day=="Night", Exp_Flux_Corr > 0, Port. <=2, DOY >=240) %>%
+    group_by(DOY, Port.) %>%
+    summarise(night_clip_mean = mean(Exp_Flux_Corr))
+
+Night_GPP_not_clipped<-dat.df %>%
+    select(Port., DFOY, DOY, Exp_Flux_Corr, Binned.Time.of.Day) %>%
+    filter(Binned.Time.of.Day=="Night", Exp_Flux_Corr > 0, Port. >=3, DOY >=240) %>%
+    group_by(DOY, Port.) %>%
+    summarise(night_unclip_mean = mean(Exp_Flux_Corr))
+              
+head(night_GPP_clipped)
+head(Night_GPP_not_clipped)
+
+Ave_per_port_night_clipped<- colSums(night_GPP_clipped[,3])/2
+Ave_per_port_night_unclipped <- colSums(Night_GPP_not_clipped[,3])/4
+
+Ave_per_port_night_clipped
+Ave_per_port_night_unclipped
+
+```
+
+Transient code... looking at paired chambers (1 & 5) pre-cut and after cut.
+
+```{r}
+
+night_GPP_clipped<-dat.df %>%
+    select(Port., DFOY, DOY, Exp_Flux_Corr, Binned.Time.of.Day) %>%
+    filter(Binned.Time.of.Day=="Night", Exp_Flux_Corr > 0, Port. ==1, DOY > 240) %>%
+    group_by(DOY, Port.) %>%
+    summarise(night_clip_mean = mean(Exp_Flux_Corr))
+
+Night_GPP_not_clipped<-dat.df %>%
+    select(Port., DFOY, DOY, Exp_Flux_Corr, Binned.Time.of.Day) %>%
+    filter(Binned.Time.of.Day=="Night", Exp_Flux_Corr > 0, Port. ==5, DOY > 240) %>%
+    group_by(DOY, Port.) %>%
+    summarise(night_unclip_mean = mean(Exp_Flux_Corr))
+              
+#head(night_GPP_clipped)
+#head(Night_GPP_not_clipped)
+
+Ave_per_port_night_clipped<- colSums(night_GPP_clipped[,3])
+Ave_per_port_night_unclipped <- colSums(Night_GPP_not_clipped[,3])
+
+Ave_per_port_night_clipped
+Ave_per_port_night_unclipped
+
+```
+
 
