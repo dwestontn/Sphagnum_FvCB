@@ -98,4 +98,7 @@ c<-dat.df %>%
 ```
 
 
+So its possible there is a tissue respiration signal that is distinguishable from peat respiration. Will look at this with some simple cumsum plots. 
+
+daily night time averge for 2 clip plots vs non-clipped. 
 
